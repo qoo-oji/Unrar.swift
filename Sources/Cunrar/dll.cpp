@@ -29,7 +29,30 @@ HANDLE PASCAL RAROpenArchive(struct RAROpenArchiveData *r)
 }
 
 
+// [qoo-oji fork] Shared by RAROpenArchiveEx (file) and RAROpenArchiveMem (memory).
+static HANDLE OpenArchiveCommon(struct RAROpenArchiveDataEx *r,const void *MemData,size_t MemSize);
+
 HANDLE PASCAL RAROpenArchiveEx(struct RAROpenArchiveDataEx *r)
+{
+  return OpenArchiveCommon(r,nullptr,0);
+}
+
+
+// [qoo-oji fork] Opens an archive that the caller holds in memory. The buffer must
+// stay valid until RARCloseArchive. ArcName/ArcNameW are optional and only used for
+// messages. Multi-volume archives cannot be followed from memory.
+HANDLE PASCAL RAROpenArchiveMem(struct RAROpenArchiveDataEx *r,const void *Data,size_t Size)
+{
+  if (Data==nullptr)
+  {
+    r->OpenResult=ERAR_EOPEN;
+    return nullptr;
+  }
+  return OpenArchiveCommon(r,Data,Size);
+}
+
+
+static HANDLE OpenArchiveCommon(struct RAROpenArchiveDataEx *r,const void *MemData,size_t MemSize)
 {
   DataSet *Data=nullptr;
   try
@@ -69,7 +92,15 @@ HANDLE PASCAL RAROpenArchiveEx(struct RAROpenArchiveDataEx *r)
     // Open shared mode is added by request of dll users, who need to
     // browse and unpack archives while downloading.
     Data->Cmd.OpenShared=(r->OpFlags&ROADOF_SHARED)!=0;
-    if (!Data->Arc.Open(ArcName,Data->Cmd.OpenShared ? FMF_OPENSHARED:0))
+    bool Opened;
+    if (MemData!=nullptr)
+    {
+      Data->Arc.FileName=ArcName;
+      Opened=Data->Arc.OpenMemory(MemData,MemSize);
+    }
+    else
+      Opened=Data->Arc.Open(ArcName,Data->Cmd.OpenShared ? FMF_OPENSHARED:0);
+    if (!Opened)
     {
       r->OpenResult=ERAR_EOPEN;
       delete Data;

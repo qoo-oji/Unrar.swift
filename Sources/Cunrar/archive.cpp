@@ -316,6 +316,19 @@ bool Archive::Open(const std::wstring &Name,uint Mode)
 }
 
 
+// [qoo-oji fork]
+bool Archive::OpenMemory(const void *Data,size_t Size)
+{
+#ifdef USE_QOPEN
+  QOpen.Unload();
+#endif
+  bool Success=File::OpenMemory(Data,Size);
+  if (Success && FileName.empty())
+    FileName=L"memory.rar"; // Only shown in messages; volumes are not supported for memory archives.
+  return Success;
+}
+
+
 int Archive::Read(void *Data,size_t Size)
 {
   size_t Result;

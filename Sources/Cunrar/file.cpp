@@ -19,6 +19,9 @@ File::File()
   ReadErrorMode=FREM_ASK;
   TruncatedAfterReadError=false;
   CurFilePos=0;
+  MemData=nullptr;
+  MemSize=0;
+  MemPos=0;
 }
 
 
@@ -40,7 +43,26 @@ void File::operator = (File &SrcFile)
   HandleType=SrcFile.HandleType;
   TruncatedAfterReadError=SrcFile.TruncatedAfterReadError;
   FileName=SrcFile.FileName;
+  MemData=SrcFile.MemData;
+  MemSize=SrcFile.MemSize;
+  MemPos=SrcFile.MemPos;
   SrcFile.SkipClose=true;
+}
+
+
+// [qoo-oji fork]
+bool File::OpenMemory(const void *Data,size_t Size)
+{
+  Close();
+  ErrorType=FILE_SUCCESS;
+  NewFile=false;
+  LastWrite=false;
+  HandleType=FILE_HANDLENORMAL;
+  TruncatedAfterReadError=false;
+  MemData=(const byte *)Data;
+  MemSize=Size;
+  MemPos=0;
+  return true;
 }
 
 
@@ -247,6 +269,10 @@ bool File::WCreate(const std::wstring &Name,uint Mode)
 bool File::Close()
 {
   bool Success=true;
+
+  MemData=nullptr; // [qoo-oji fork]
+  MemSize=0;
+  MemPos=0;
 
   if (hFile!=FILE_BAD_HANDLE)
   {
@@ -457,6 +483,18 @@ int File::DirectRead(void *Data,size_t Size)
   const size_t MaxDeviceRead=20000;
   const size_t MaxLockedRead=32768;
 #endif
+  if (MemData!=nullptr) // [qoo-oji fork]
+  {
+    size_t Avail=MemPos<(int64)MemSize ? (size_t)(MemSize-(size_t)MemPos):0;
+    if (Size>Avail)
+      Size=Avail;
+    if (Size>(size_t)INT_MAX)
+      Size=(size_t)INT_MAX;
+    if (Size!=0)
+      memcpy(Data,MemData+MemPos,Size);
+    MemPos+=Size;
+    return (int)Size;
+  }
   if (HandleType==FILE_HANDLESTD)
   {
 #ifdef _WIN_ALL
@@ -526,6 +564,21 @@ void File::Seek(int64 Offset,int Method)
 
 bool File::RawSeek(int64 Offset,int Method)
 {
+  if (MemData!=nullptr) // [qoo-oji fork]
+  {
+    int64 NewPos;
+    switch(Method)
+    {
+      case SEEK_SET: NewPos=Offset; break;
+      case SEEK_CUR: NewPos=MemPos+Offset; break;
+      case SEEK_END: NewPos=(int64)MemSize+Offset; break;
+      default: return false;
+    }
+    if (NewPos<0)
+      return false;
+    MemPos=NewPos; // Like lseek, positions past the end are allowed; reads return 0 there.
+    return true;
+  }
   if (hFile==FILE_BAD_HANDLE)
     return true;
   if (!IsSeekable()) // To extract archives from stdin with -si.
@@ -587,6 +640,8 @@ bool File::RawSeek(int64 Offset,int Method)
 
 int64 File::Tell()
 {
+  if (MemData!=nullptr) // [qoo-oji fork]
+    return MemPos;
   if (hFile==FILE_BAD_HANDLE)
     if (AllowExceptions)
       ErrHandler.SeekError(FileName);

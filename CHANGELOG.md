@@ -1,4 +1,8 @@
 # CHANGELOG
+## Unreleased
+
+- Add `Archive(data:)` / `Archive(source:)` to read an archive held in memory without a temporary file (`RAROpenArchiveMem` in the bundled unrar)
+
 ## v0.5.4 (2026-06-30)
 
 - Update unrar to v7.23 (2026-06-27)

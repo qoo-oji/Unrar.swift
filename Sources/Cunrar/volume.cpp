@@ -27,6 +27,17 @@ bool MergeArchive(Archive &Arc,ComprDataIO *DataIO,bool ShowFileName,wchar Comma
 
   bool PrevVolEncrypted=Arc.Encrypted;
 
+  // [qoo-oji fork] An archive held in memory has no neighbouring volumes to open,
+  // and the DLL callback loop below would never terminate without a real file.
+  if (Arc.IsMemory())
+  {
+    std::wstring MissingName=Arc.FileName;
+    NextVolumeName(MissingName,!Arc.NewNumbering);
+    ErrHandler.SetErrorCode(RARX_OPEN);
+    uiMsg(UIERROR_MISSINGVOL,MissingName);
+    return false;
+  }
+
   int64 PosBeforeClose=Arc.Tell();
 
   if (DataIO!=NULL)

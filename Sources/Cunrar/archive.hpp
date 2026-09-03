@@ -87,6 +87,8 @@ class Archive:public File
     HEADER_TYPE GetHeaderType() {return CurHeaderType;}
     CommandData* GetCommandData() {return Cmd;}
     void SetSilentOpen(bool Mode) {SilentOpen=Mode;}
+    // [qoo-oji fork] Open an archive held in memory (see File::OpenMemory).
+    bool OpenMemory(const void *Data,size_t Size);
 #ifdef USE_QOPEN
     bool Open(const std::wstring &Name,uint Mode=FMF_READ) override;
     int Read(void *Data,size_t Size) override;

@@ -14,10 +14,10 @@ Swift library wraps unrar C++ library provided by [rarlib](https://www.rarlab.co
   - [x] Get comment from the archive
   - [x] Get comment from archive entries
   - [x] SFX archive
+  - [x] Extract from archive on the memory (`Archive(data:)`, fork addition)
 - [ ] Unsupported
   - [ ] Extract to file
-  - [ ] Extract from archive on the memory
-  - [ ] Multi-Volume
+  - [ ] Multi-Volume (and never for archives on the memory)
 
 ## Usage
 
@@ -28,7 +28,13 @@ let archive = try Archive(path: "/path/to/archive.rar")
 let comment = try archive.comment()
 let entries = try archive.entries()
 let extractedData = try archive.extract(entries[0])
+
+// An archive held in memory (e.g. one stored inside another archive):
+// nothing is written to disk, the bytes are read in place.
+let inner = try Archive(data: bytes)
 ```
+
+Details of this fork's changes: [docs/MemoryArchive.md](docs/MemoryArchive.md) (Japanese).
 
 ## Installation
 

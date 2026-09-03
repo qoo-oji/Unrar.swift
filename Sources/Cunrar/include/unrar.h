@@ -169,6 +169,8 @@ extern "C" {
 
 HANDLE PASCAL RAROpenArchive(struct RAROpenArchiveData *ArchiveData);
 HANDLE PASCAL RAROpenArchiveEx(struct RAROpenArchiveDataEx *ArchiveData);
+/* [qoo-oji fork] Open an archive held in memory; the buffer must outlive the handle. */
+HANDLE PASCAL RAROpenArchiveMem(struct RAROpenArchiveDataEx *ArchiveData,const void *Data,size_t Size);
 int    PASCAL RARCloseArchive(HANDLE hArcData);
 int    PASCAL RARReadHeader(HANDLE hArcData,struct RARHeaderData *HeaderData);
 int    PASCAL RARReadHeaderEx(HANDLE hArcData,struct RARHeaderDataEx *HeaderData);

@@ -79,6 +79,12 @@ class File
     bool TruncatedAfterReadError;
 
     int64 CurFilePos; // Used for forward seeks in stdin files.
+
+    // [qoo-oji fork] In-memory source, see OpenMemory(). When MemData is set,
+    // DirectRead/RawSeek/Tell/Close/IsOpened operate on this buffer instead of hFile.
+    const byte *MemData;
+    size_t MemSize;
+    int64 MemPos;
   protected:
     bool OpenShared; // Set by 'Archive' class.
   public:
@@ -93,6 +99,10 @@ class File
     // Several functions below are 'virtual', because they are redefined
     // by Archive for QOpen and by MultiFile for split files in WinRAR.
     virtual bool Open(const std::wstring &Name,uint Mode=FMF_READ);
+    // [qoo-oji fork] Read-only access to a caller-owned buffer, which must stay
+    // valid until Close(). Used to read archives without writing them to disk.
+    bool OpenMemory(const void *Data,size_t Size);
+    bool IsMemory() {return MemData!=nullptr;}
     void TOpen(const std::wstring &Name);
     bool WOpen(const std::wstring &Name);
     bool Create(const std::wstring &Name,uint Mode=FMF_UPDATE|FMF_SHAREREAD);
@@ -119,7 +129,7 @@ class File
     static void StatToRarTime(struct stat &st,RarTime *ftm,RarTime *ftc,RarTime *fta);
 #endif
     void GetOpenFileTime(RarTime *ftm,RarTime *ftc=NULL,RarTime *fta=NULL);
-    virtual bool IsOpened() {return hFile!=FILE_BAD_HANDLE;} // 'virtual' for MultiFile class.
+    virtual bool IsOpened() {return hFile!=FILE_BAD_HANDLE || MemData!=nullptr;} // 'virtual' for MultiFile class.
     virtual int64 FileLength(); // 'virtual' for MultiFile class.
     void SetHandleType(FILE_HANDLETYPE Type) {HandleType=Type;}
     void SetLineInputMode(bool Mode) {LineInput=Mode;}
