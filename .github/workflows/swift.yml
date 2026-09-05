@@ -7,6 +7,7 @@ on:
     branches: [ main, memory-archive ]
   pull_request:
     branches: [ main, memory-archive ]
+  workflow_dispatch:
 
 jobs:
   build:
