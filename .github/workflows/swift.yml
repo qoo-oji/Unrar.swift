@@ -1,10 +1,12 @@
 name: Swift
 
+# memory-archive is this fork's working branch (qooViewer pins it by branch +
+# revision), so it has to be built and tested here as well as main.
 on:
   push:
-    branches: [ main ]
+    branches: [ main, memory-archive ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, memory-archive ]
 
 jobs:
   build:
