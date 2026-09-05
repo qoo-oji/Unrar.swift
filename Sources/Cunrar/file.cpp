@@ -1,4 +1,6 @@
 #include "rar.hpp"
+// [qoo-oji fork] INT_MAX below: macOS pulls it in through rar.hpp, Linux does not.
+#include <climits>
 
 File::File()
 {
