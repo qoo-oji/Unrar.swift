@@ -210,7 +210,7 @@ public struct Archive: Sendable {
     /// Every public operation opens and closes the archive within one call. That is what
     /// makes the in-memory source safe: the buffer is only borrowed (`withUnsafeBytes`)
     /// for the duration of the call, so no copy of the archive bytes is needed.
-    private static func withOpenArchive<T>(
+    static func withOpenArchive<T>(
         source: Source,
         password: String?,
         flags: inout RAROpenArchiveDataEx,

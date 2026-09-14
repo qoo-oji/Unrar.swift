@@ -2,6 +2,7 @@
 ## Unreleased
 
 - Add `Archive(data:)` / `Archive(source:)` to read an archive held in memory without a temporary file (`RAROpenArchiveMem` in the bundled unrar)
+- Add `Archive.forEachEntry(_:)` to read every entry in one pass; reading all entries of a solid archive no longer takes quadratic time
 
 ## v0.5.4 (2026-06-30)
 
