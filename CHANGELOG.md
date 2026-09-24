@@ -3,6 +3,7 @@
 
 - Add `Archive(data:)` / `Archive(source:)` to read an archive held in memory without a temporary file (`RAROpenArchiveMem` in the bundled unrar)
 - Add `Archive.forEachEntry(_:)` to read every entry in one pass; reading all entries of a solid archive no longer takes quadratic time
+- Fix spurious errors when archives are read on several threads at once: unrar's error state (`ErrHandler`) is now per thread, so a failing archive on one thread no longer makes another thread's successful read report its error
 - Add `Archive.Source.reader(PositionalReader)` to read an archive through a caller-supplied positional reader (`RAROpenArchiveCallback` in the bundled unrar), e.g. a block cache over a network volume
 
 ## v0.5.4 (2026-06-30)

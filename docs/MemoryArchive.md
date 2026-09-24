@@ -79,6 +79,19 @@ Unrar.swift は `entries()` / `extract()` / `comment()` のたびに書庫を開
   バッファが埋まるまで(または 0 / -1 まで)繰り返して呼ぶ。
 - 寿命: メモリ入力と同じく、各操作が開いて閉じる間だけ借りる(`withExtendedLifetime`)。
 
+## 複数のスレッドで同時に読む(`ErrHandler` をスレッドごとに、2026-09-25)
+
+unrar は操作の結果(エラー)を 1 つのオブジェクト `ErrHandler` に持ち、DLL は `RARReadHeaderEx` / `RARProcessFile` の
+最後にその値を返す(`RAROpenArchiveEx` は `ErrHandler.Clean()` で消す)。upstream ではこれがプロセスに 1 つ
+(`global.hpp` の `EXTVAR ErrorHandler ErrHandler;`)なので、**別のスレッドで別の書庫を読んでいると、片方の失敗
+(CRC エラーなど)がもう片方の成功した読みの戻り値になる**。qooViewer のテストを並べて走らせたとき、壊れた rar の
+テストと同時に走った無関係な rar の読みが `badData` / `unknown` で失敗して見つかった。
+
+`global.hpp` / `array.hpp` の宣言を `thread_local` にした。DLL の 1 回の操作は呼び出したスレッドの上で完結する
+(内部のワーカースレッドを使う `RAR_SMP` は Windows でしか定義されない)ので、スレッドごとの状態がそのまま
+その操作の状態になる。`ConcurrencyTests` が、片方のスレッドで CRC エラーの書庫を読み続けながら、もう片方で
+正常な書庫を読んで一度も失敗しないことを確かめる(修正前は 400 周で 8 回失敗した)。
+
 ## テスト
 
 ```sh
@@ -98,6 +111,7 @@ swift test
 ## upstream への追従
 
 Unrar.swift は unrar の新版を年に数回取り込みます。パッチは `[qoo-oji fork]` のコメントで印を付けた
-数十行(file.hpp / file.cpp / archive.hpp / archive.cpp / volume.cpp / dll.cpp / dll.hpp / include/unrar.h)
+数十行(file.hpp / file.cpp / archive.hpp / archive.cpp / volume.cpp / dll.cpp / dll.hpp / include/unrar.h /
+global.hpp / array.hpp)
 なので、`git merge upstream/main` で衝突したらこの印を頼りに当て直し、`swift test` を通してください
 (呼び出し側の関数から読む入口も同じ印の中にあります)。

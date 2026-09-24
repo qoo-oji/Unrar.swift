@@ -1,7 +1,7 @@
 #ifndef _RAR_ARRAY_
 #define _RAR_ARRAY_
 
-extern ErrorHandler ErrHandler;
+extern thread_local ErrorHandler ErrHandler; // [qoo-oji fork] see global.hpp
 
 template <class T> class Array
 {
