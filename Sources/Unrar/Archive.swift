@@ -13,15 +13,36 @@ public struct Archive: Sendable {
         /// directly (fork addition, see `RAROpenArchiveMem` in Cunrar). Multi-volume
         /// archives cannot be followed from memory.
         case memory(Data)
+        /// The archive read through a caller-supplied positional reader (fork addition, see
+        /// `RAROpenArchiveCallback` in Cunrar). Lets a client put its own I/O layer (for example a
+        /// block cache over a network volume) under unrar. Multi-volume archives cannot be followed.
+        case reader(PositionalReader)
+    }
+
+    /// Reads bytes of an archive by position, for `Source.reader`.
+    ///
+    /// `read(offset, buffer)` fills up to `buffer.count` bytes starting at `offset` and returns how
+    /// many it filled: 0 at or past the end of the archive, -1 on an error (which unrar reports as a read
+    /// error). It may return fewer bytes than asked; the archive asks again for the rest. It is called on the thread that runs the unrar call, one call at a time for
+    /// a given operation; the same reader may be used by operations on different threads only if the
+    /// closure is thread-safe.
+    public final class PositionalReader: @unchecked Sendable {
+        public let size: Int64
+        let read: (Int64, UnsafeMutableRawBufferPointer) -> Int
+
+        public init(size: Int64, read: @escaping (Int64, UnsafeMutableRawBufferPointer) -> Int) {
+            self.size = size
+            self.read = read
+        }
     }
 
     public let source: Source
-    /// The archive file. For an in-memory archive this is the placeholder `memory:` URL;
+    /// The archive file. For an in-memory or reader-backed archive this is the placeholder `memory:` URL;
     /// check `source` to tell the two apart.
     public var fileURL: URL {
         switch source {
         case .file(let url): return url
-        case .memory: return Archive.memoryPlaceholderURL
+        case .memory, .reader: return Archive.memoryPlaceholderURL
         }
     }
     static let memoryPlaceholderURL = URL(string: "memory:")!
@@ -226,6 +247,28 @@ public struct Archive: Sendable {
         case .memory(let data):
             return try data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) -> T in
                 let handle = UnsafeMutableRawPointer(RAROpenArchiveMem(&flags, bytes.baseAddress, bytes.count))
+                return try Archive.run(handle: handle, password: password, flags: &flags, body)
+            }
+        case .reader(let reader):
+            // The reader is only borrowed for this call (every operation opens and closes the archive),
+            // so an unretained pointer is enough while `withExtendedLifetime` keeps it alive.
+            return try withExtendedLifetime(reader) {
+                let context = Unmanaged.passUnretained(reader).toOpaque()
+                let callback: @convention(c) (UnsafeMutableRawPointer?, Int64, UnsafeMutableRawPointer?, Int) -> Int64 = { ctx, offset, buf, size in
+                    guard let ctx, let buf else { return -1 }
+                    let reader = Unmanaged<PositionalReader>.fromOpaque(ctx).takeUnretainedValue()
+                    // unrar's File::Read takes a short read for the end of the data (a disk file only returns one
+                    // there), so keep asking until the buffer is full, the reader reports the end (0) or an error.
+                    var filled = 0
+                    while filled < size {
+                        let got = reader.read(offset + Int64(filled), UnsafeMutableRawBufferPointer(start: buf + filled, count: size - filled))
+                        if got < 0 { return filled > 0 ? Int64(filled) : -1 }
+                        if got == 0 { break }
+                        filled += got
+                    }
+                    return Int64(filled)
+                }
+                let handle = UnsafeMutableRawPointer(RAROpenArchiveCallback(&flags, callback, context, reader.size))
                 return try Archive.run(handle: handle, password: password, flags: &flags, body)
             }
         }

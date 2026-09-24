@@ -15,6 +15,7 @@ Swift library wraps unrar C++ library provided by [rarlib](https://www.rarlab.co
   - [x] Get comment from archive entries
   - [x] SFX archive
   - [x] Extract from archive on the memory (`Archive(data:)`, fork addition)
+  - [x] Read through a caller-supplied positional reader (`Archive(source: .reader(...))`, fork addition)
   - [x] Read every entry in one pass (`forEachEntry`, fork addition; fast for solid archives)
 - [ ] Unsupported
   - [ ] Extract to file

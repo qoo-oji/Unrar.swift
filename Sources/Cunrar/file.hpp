@@ -84,6 +84,10 @@ class File
     // DirectRead/RawSeek/Tell/Close/IsOpened operate on this buffer instead of hFile.
     const byte *MemData;
     size_t MemSize;
+    // [qoo-oji fork] Caller-supplied positional reader (see OpenCallback()).
+    // Uses MemSize as the source size and MemPos as the position.
+    int64 (*CbRead)(void *Ctx,int64 Offset,void *Buf,size_t Size);
+    void *CbCtx;
     int64 MemPos;
   protected:
     bool OpenShared; // Set by 'Archive' class.
@@ -102,7 +106,8 @@ class File
     // [qoo-oji fork] Read-only access to a caller-owned buffer, which must stay
     // valid until Close(). Used to read archives without writing them to disk.
     bool OpenMemory(const void *Data,size_t Size);
-    bool IsMemory() {return MemData!=nullptr;}
+    bool IsMemory() {return MemData!=nullptr || CbRead!=nullptr;}
+    bool OpenCallback(int64 (*Read)(void *,int64,void *,size_t),void *Ctx,int64 Size);
     void TOpen(const std::wstring &Name);
     bool WOpen(const std::wstring &Name);
     bool Create(const std::wstring &Name,uint Mode=FMF_UPDATE|FMF_SHAREREAD);
@@ -129,7 +134,7 @@ class File
     static void StatToRarTime(struct stat &st,RarTime *ftm,RarTime *ftc,RarTime *fta);
 #endif
     void GetOpenFileTime(RarTime *ftm,RarTime *ftc=NULL,RarTime *fta=NULL);
-    virtual bool IsOpened() {return hFile!=FILE_BAD_HANDLE || MemData!=nullptr;} // 'virtual' for MultiFile class.
+    virtual bool IsOpened() {return hFile!=FILE_BAD_HANDLE || MemData!=nullptr || CbRead!=nullptr;} // 'virtual' for MultiFile class.
     virtual int64 FileLength(); // 'virtual' for MultiFile class.
     void SetHandleType(FILE_HANDLETYPE Type) {HandleType=Type;}
     void SetLineInputMode(bool Mode) {LineInput=Mode;}

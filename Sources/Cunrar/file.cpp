@@ -24,6 +24,8 @@ File::File()
   MemData=nullptr;
   MemSize=0;
   MemPos=0;
+  CbRead=nullptr;
+  CbCtx=nullptr;
 }
 
 
@@ -48,6 +50,8 @@ void File::operator = (File &SrcFile)
   MemData=SrcFile.MemData;
   MemSize=SrcFile.MemSize;
   MemPos=SrcFile.MemPos;
+  CbRead=SrcFile.CbRead;
+  CbCtx=SrcFile.CbCtx;
   SrcFile.SkipClose=true;
 }
 
@@ -63,6 +67,23 @@ bool File::OpenMemory(const void *Data,size_t Size)
   TruncatedAfterReadError=false;
   MemData=(const byte *)Data;
   MemSize=Size;
+  MemPos=0;
+  return true;
+}
+
+
+// [qoo-oji fork]
+bool File::OpenCallback(int64 (*Read)(void *,int64,void *,size_t),void *Ctx,int64 Size)
+{
+  Close();
+  ErrorType=FILE_SUCCESS;
+  NewFile=false;
+  LastWrite=false;
+  HandleType=FILE_HANDLENORMAL;
+  TruncatedAfterReadError=false;
+  CbRead=Read;
+  CbCtx=Ctx;
+  MemSize=(size_t)Size;
   MemPos=0;
   return true;
 }
@@ -275,6 +296,8 @@ bool File::Close()
   MemData=nullptr; // [qoo-oji fork]
   MemSize=0;
   MemPos=0;
+  CbRead=nullptr;
+  CbCtx=nullptr;
 
   if (hFile!=FILE_BAD_HANDLE)
   {
@@ -485,6 +508,16 @@ int File::DirectRead(void *Data,size_t Size)
   const size_t MaxDeviceRead=20000;
   const size_t MaxLockedRead=32768;
 #endif
+  if (CbRead!=nullptr) // [qoo-oji fork]
+  {
+    if (Size>(size_t)INT_MAX)
+      Size=(size_t)INT_MAX;
+    int64 Got=CbRead(CbCtx,MemPos,Data,Size);
+    if (Got<0)
+      return -1;
+    MemPos+=Got;
+    return (int)Got;
+  }
   if (MemData!=nullptr) // [qoo-oji fork]
   {
     size_t Avail=MemPos<(int64)MemSize ? (size_t)(MemSize-(size_t)MemPos):0;
@@ -566,7 +599,7 @@ void File::Seek(int64 Offset,int Method)
 
 bool File::RawSeek(int64 Offset,int Method)
 {
-  if (MemData!=nullptr) // [qoo-oji fork]
+  if (MemData!=nullptr || CbRead!=nullptr) // [qoo-oji fork]
   {
     int64 NewPos;
     switch(Method)
@@ -642,7 +675,7 @@ bool File::RawSeek(int64 Offset,int Method)
 
 int64 File::Tell()
 {
-  if (MemData!=nullptr) // [qoo-oji fork]
+  if (MemData!=nullptr || CbRead!=nullptr) // [qoo-oji fork]
     return MemPos;
   if (hFile==FILE_BAD_HANDLE)
     if (AllowExceptions)

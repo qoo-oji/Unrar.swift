@@ -62,11 +62,32 @@ Unrar.swift は `entries()` / `extract()` / `comment()` のたびに書庫を開
   次巻にまたがるエントリの取り出しはエラーになります。
 - `Archive` はスレッドセーフではありません(upstream と同じ)。
 
+## 呼び出し側の関数から読む(`Source.reader`、2026-09-24)
+
+メモリ入力と同じ仕組みで、読み取りを**呼び出し側の関数**へ回す入口も足しました。qooViewer がネットワーク
+ボリューム上の書庫を、自前のブロックキャッシュ(読み込み層)を通して読むためのものです(unrar はヘッダーを
+「7 バイト+残り」の 2 回の素の `read()` で読むので、SMB では 1 回ごとに往復を待ちます)。
+
+- unrar 側: `File` に `CbRead` / `CbCtx` を足し、`OpenCallback(Read, Ctx, Size)` を追加。位置と大きさはメモリ
+  モードの `MemPos` / `MemSize` を共用し、`DirectRead` だけが `memcpy` の代わりに関数を呼ぶ。`RawSeek` /
+  `Tell` / `Close` / `IsOpened` / `IsMemory` はメモリモードと同じ扱い(`IsMemory` が真なので、分割ボリュームの
+  次巻も同じく探さずに失敗する)。DLL に `RAROpenArchiveCallback(RAROpenArchiveDataEx*, Read, Ctx, Size)`。
+  関数は `long long (*)(void *Ctx, long long Offset, void *Buf, size_t Size)` で、読めたバイト数(終わりで 0、
+  失敗で -1)を返す。
+- Swift 側: `Archive.Source.reader(PositionalReader)`。`PositionalReader(size:read:)` の `read` は短い読みを
+  返してよい ―― unrar の `File::Read` は短い読みを「データの終わり」と受け取るので、Swift 側の橋渡しが
+  バッファが埋まるまで(または 0 / -1 まで)繰り返して呼ぶ。
+- 寿命: メモリ入力と同じく、各操作が開いて閉じる間だけ借りる(`withExtendedLifetime`)。
+
 ## テスト
 
 ```sh
 swift test
 ```
+
+`ReaderArchiveTests` は同じ fixture を `Source.reader` で読み、ファイル版と一致すること(1 回 7 バイトずつしか
+返さない読み手でも)、`forEachEntry` の一致、読み取りの失敗で落ちずにエラーになること、ゴミデータ、分割
+ボリュームの先頭巻を確認します。
 
 `MemoryArchiveTests` は同梱 fixture(通常・マルチバイト名・RAR4 形式・BLAKE2・暗号化・ヘッダ暗号化)を
 `Data` で読み込み、`entries()` と各エントリの `extract()`、`comment()` がファイル版と一致することを確認
@@ -78,4 +99,5 @@ swift test
 
 Unrar.swift は unrar の新版を年に数回取り込みます。パッチは `[qoo-oji fork]` のコメントで印を付けた
 数十行(file.hpp / file.cpp / archive.hpp / archive.cpp / volume.cpp / dll.cpp / dll.hpp / include/unrar.h)
-なので、`git merge upstream/main` で衝突したらこの印を頼りに当て直し、`swift test` を通してください。
+なので、`git merge upstream/main` で衝突したらこの印を頼りに当て直し、`swift test` を通してください
+(呼び出し側の関数から読む入口も同じ印の中にあります)。

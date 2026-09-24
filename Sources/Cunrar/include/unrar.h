@@ -171,6 +171,9 @@ HANDLE PASCAL RAROpenArchive(struct RAROpenArchiveData *ArchiveData);
 HANDLE PASCAL RAROpenArchiveEx(struct RAROpenArchiveDataEx *ArchiveData);
 /* [qoo-oji fork] Open an archive held in memory; the buffer must outlive the handle. */
 HANDLE PASCAL RAROpenArchiveMem(struct RAROpenArchiveDataEx *ArchiveData,const void *Data,size_t Size);
+/* [qoo-oji fork] Open an archive read through a positional reader callback. */
+HANDLE PASCAL RAROpenArchiveCallback(struct RAROpenArchiveDataEx *ArchiveData,
+  long long (*Read)(void *Ctx,long long Offset,void *Buf,size_t Size),void *Ctx,long long Size);
 int    PASCAL RARCloseArchive(HANDLE hArcData);
 int    PASCAL RARReadHeader(HANDLE hArcData,struct RARHeaderData *HeaderData);
 int    PASCAL RARReadHeaderEx(HANDLE hArcData,struct RARHeaderDataEx *HeaderData);

@@ -30,7 +30,20 @@ HANDLE PASCAL RAROpenArchive(struct RAROpenArchiveData *r)
 
 
 // [qoo-oji fork] Shared by RAROpenArchiveEx (file) and RAROpenArchiveMem (memory).
-static HANDLE OpenArchiveCommon(struct RAROpenArchiveDataEx *r,const void *MemData,size_t MemSize);
+static HANDLE OpenArchiveCommon(struct RAROpenArchiveDataEx *r,const void *MemData,size_t MemSize,
+  int64 (*CbRead)(void *,int64,void *,size_t)=nullptr,void *CbCtx=nullptr,int64 CbSize=0);
+
+// [qoo-oji fork] Opens an archive read through a caller-supplied positional reader.
+HANDLE PASCAL RAROpenArchiveCallback(struct RAROpenArchiveDataEx *r,
+  long long (*Read)(void *Ctx,long long Offset,void *Buf,size_t Size),void *Ctx,long long Size)
+{
+  if (Read==nullptr)
+  {
+    r->OpenResult=ERAR_EOPEN;
+    return nullptr;
+  }
+  return OpenArchiveCommon(r,nullptr,0,(int64 (*)(void *,int64,void *,size_t))Read,Ctx,Size);
+}
 
 HANDLE PASCAL RAROpenArchiveEx(struct RAROpenArchiveDataEx *r)
 {
@@ -52,7 +65,8 @@ HANDLE PASCAL RAROpenArchiveMem(struct RAROpenArchiveDataEx *r,const void *Data,
 }
 
 
-static HANDLE OpenArchiveCommon(struct RAROpenArchiveDataEx *r,const void *MemData,size_t MemSize)
+static HANDLE OpenArchiveCommon(struct RAROpenArchiveDataEx *r,const void *MemData,size_t MemSize,
+  int64 (*CbRead)(void *,int64,void *,size_t),void *CbCtx,int64 CbSize)
 {
   DataSet *Data=nullptr;
   try
@@ -93,7 +107,12 @@ static HANDLE OpenArchiveCommon(struct RAROpenArchiveDataEx *r,const void *MemDa
     // browse and unpack archives while downloading.
     Data->Cmd.OpenShared=(r->OpFlags&ROADOF_SHARED)!=0;
     bool Opened;
-    if (MemData!=nullptr)
+    if (CbRead!=nullptr)
+    {
+      Data->Arc.FileName=ArcName;
+      Opened=Data->Arc.OpenCallback(CbRead,CbCtx,CbSize);
+    }
+    else if (MemData!=nullptr)
     {
       Data->Arc.FileName=ArcName;
       Opened=Data->Arc.OpenMemory(MemData,MemSize);

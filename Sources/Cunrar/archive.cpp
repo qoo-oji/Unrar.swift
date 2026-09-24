@@ -329,6 +329,19 @@ bool Archive::OpenMemory(const void *Data,size_t Size)
 }
 
 
+// [qoo-oji fork]
+bool Archive::OpenCallback(int64 (*Read)(void *,int64,void *,size_t),void *Ctx,int64 Size)
+{
+#ifdef USE_QOPEN
+  QOpen.Unload();
+#endif
+  bool Success=File::OpenCallback(Read,Ctx,Size);
+  if (Success && FileName.empty())
+    FileName=L"callback.rar";
+  return Success;
+}
+
+
 int Archive::Read(void *Data,size_t Size)
 {
   size_t Result;

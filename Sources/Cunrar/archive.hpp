@@ -89,6 +89,7 @@ class Archive:public File
     void SetSilentOpen(bool Mode) {SilentOpen=Mode;}
     // [qoo-oji fork] Open an archive held in memory (see File::OpenMemory).
     bool OpenMemory(const void *Data,size_t Size);
+    bool OpenCallback(int64 (*Read)(void *,int64,void *,size_t),void *Ctx,int64 Size);
 #ifdef USE_QOPEN
     bool Open(const std::wstring &Name,uint Mode=FMF_READ) override;
     int Read(void *Data,size_t Size) override;
